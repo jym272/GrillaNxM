@@ -83,7 +83,7 @@
         function loadShaders() {
 
             $.when(loadVS(), loadFS()).done(function (res1, res2) {
-                //this code is executed when all ajax calls are done     
+                //this code is this.executed when all ajax calls are done     
                 webGLStart();
             });
 
@@ -239,120 +239,107 @@
             drawScene();
         }
 
+        function subFolder(gui_folder) {
+            let Superficies = new Set();
+            this.agregarSuperficie = function (unaSuperficie) {
+                Superficies.add(unaSuperficie);
+            };
+            let superficieActual = undefined;
+            let execute;
+
+            this.doItOnce = function (unaSuperficie) {
+                // Si cambia de superficie en los infinitos llamados se resetea 
+                // la funcion anonima menuEnPantalla(solo se ejectua una vez)
+                execute = (unaSuperficie == superficieActual) ? true : false;
+                if (Superficies.has(unaSuperficie))
+                    superficieActual = unaSuperficie;
+                else
+                    console.log("Esta superficie no se encuentra cargada");
+                menuEnPantalla();
+            };
+            let removerMenuAnterior = function () {
+                if (typeof gui_folder.menuFolder != "undefined") {
+                    gui_folder.gui.removeFolder(gui_folder.menuFolder);
+                    gui_folder.menuFolder = undefined;
+                }
+            }
+            let menuEnPantalla = (function () {
+                execute = false;
+                return function () {
+                    if (!execute) {
+                        execute = true; //solo ingreso una vez a menos que setee false desde afuera
+                        removerMenuAnterior();
+                        superficieActual.cargarSubMenu(gui_folder);
+                    }
+                };
+            })();
+        }
+
+        function subFolderCilindro() {
+            this.cargarSubMenu = function (gui_folder) {
+                gui_folder.menuFolder = gui_folder.gui.addFolder("Cilindro");
+                gui_folder.menuFolder.add(window, "amplitudCilindro", 0.1, 0.4).step(0.01);
+                gui_folder.menuFolder.add(window, "longitudDeOndaCilindro", 1, 10).step(1);
+                gui_folder.menuFolder.add(window, "alturaCilindro", 1, 5).step(0.2);
+                gui_folder.menuFolder.add(window, "radioCilindro", 0.1, 2).step(0.1);
+                gui_folder.menuFolder.open();
+            }
+        };
+
+        function subFolderPlano() {
+            this.cargarSubMenu = function (gui_folder) {
+                gui_folder.menuFolder = gui_folder.gui.addFolder("Plano");
+                gui_folder.menuFolder.add(window, "anchoPlano", 0, 6).step(0.1);
+                gui_folder.menuFolder.add(window, "largoPlano", 0, 6).step(0.1);
+                gui_folder.menuFolder.open();
+            }
+
+        };
+        function subFolderEsfera() {
+            this.cargarSubMenu = function (gui_folder) {
+                gui_folder.menuFolder = gui_folder.gui.addFolder("Esfera");
+                gui_folder.menuFolder.add(window, "radioEsfera", 0, 2).step(0.1);
+                gui_folder.menuFolder.open();
+            }
+        };
         function initMenu() {
-            var gui = new dat.GUI();
+            let gui_folder = {
+                gui: new dat.GUI(),
+                menuFolder: undefined,
+            };
             //menu fijo
             this.show = function () {
-                gui.add(window, "distanciaCamara", 0.01, 5).step(0.01);
-                gui.add(window, "alturaCamara", -4, 4).step(0.01);
-                gui.add(window, "velocidadAngular", 0, 1).step(0.01);
-                gui.add(window, "filas", 0, 50).step(1);
-                gui.add(window, "columnas", 0, 50).step(1);
-                gui.add(window, "modo", ["wireframe", "smooth", "edges"]);
-                gui.add(window, "superficieParametrica", ["cilindro", "plano", "esfera"]);
+                gui_folder.gui.add(window, "distanciaCamara", 0.01, 5).step(0.01);
+                gui_folder.gui.add(window, "alturaCamara", -4, 4).step(0.01);
+                gui_folder.gui.add(window, "velocidadAngular", 0, 1).step(0.01);
+                gui_folder.gui.add(window, "filas", 0, 50).step(1);
+                gui_folder.gui.add(window, "columnas", 0, 50).step(1);
+                gui_folder.gui.add(window, "modo", ["wireframe", "smooth", "edges"]);
+                gui_folder.gui.add(window, "superficieParametrica", ["cilindro", "plano", "esfera"]);
 
             }
-            var planoFolder = undefined;
-            var esferaFolder = undefined;
-            var cilindroFolder = undefined;
-            //Booleanos
-            var executedplano;
-            var executedesfera;
-            var executedcilindro;
-            //menues relativos a la opcion del usuario
-            var subfolderCilindro = (function () {
-                executedcilindro = false;
-                return function () {
-                    if (!executedcilindro) {
-                        executedcilindro = true;
-                        if (typeof esferaFolder != "undefined") {
-                            gui.removeFolder(esferaFolder);
-                            esferaFolder = undefined;
-                        }
-                        if (typeof planoFolder != "undefined") {
-                            gui.removeFolder(planoFolder);
-                            planoFolder = undefined;
-                        }
-                        cilindroFolder = gui.addFolder("Cilindro");
-                        cilindroFolder.add(window, "amplitudCilindro", 0.1, 0.4).step(0.01);
-                        cilindroFolder.add(window, "longitudDeOndaCilindro", 1, 10).step(1);
-                        cilindroFolder.add(window, "alturaCilindro", 1, 5).step(0.2);
-                        cilindroFolder.add(window, "radioCilindro", 0.1, 2).step(0.1);
-                        cilindroFolder.open();
+            let subMenu = new subFolder(gui_folder);
+            subMenu.agregarSuperficie(esfera = new subFolderEsfera);
+            subMenu.agregarSuperficie(cilindro = new subFolderCilindro);
+            subMenu.agregarSuperficie(plano = new subFolderPlano);
 
-                    }
-                };
-            })();
-
-            var subfolderPlano = (function () {
-                executedplano = false;
-                return function () {
-                    if (!executedplano) {
-                        executedplano = true;
-                        planoFolder = gui.addFolder("Plano");
-                        planoFolder.add(window, "anchoPlano", 0, 6).step(0.1);
-                        planoFolder.add(window, "largoPlano", 0, 6).step(0.1);
-                        planoFolder.open();
-                        if (typeof esferaFolder != "undefined") {
-                            gui.removeFolder(esferaFolder);
-                            esferaFolder = undefined;
-                        }
-                        if (typeof cilindroFolder != "undefined") {
-                            gui.removeFolder(cilindroFolder);
-                            cilindroFolder = undefined;
-                        }
-                    }
-                };
-            })();
-            var subfolderEsfera = (function () {
-                executedesfera = false;
-                return function () {
-                    if (!executedesfera) {
-                        executedesfera = true;
-                        esferaFolder = gui.addFolder("Esfera");
-                        esferaFolder.add(window, "radioEsfera", 0, 2).step(0.1);
-                        esferaFolder.open();
-                        if (typeof planoFolder != "undefined") {
-                            gui.removeFolder(planoFolder);
-                            planoFolder = undefined;
-                        }
-                        if (typeof cilindroFolder != "undefined") {
-                            gui.removeFolder(cilindroFolder);
-                            cilindroFolder = undefined;
-
-                        }
-
-                    }
-                };
-            })();
+            //infinitos llamados a una de las tres funciones en el programa, se ejecuta metodo anonimo solo una vez
             this.showSubfolderEsfera = function () {
-                executedplano = false;
-                executedcilindro = false;
-                subfolderEsfera();
+                subMenu.doItOnce(esfera);
             }
             this.showSubfolderPlano = function () {
-                executedesfera = false;
-                executedcilindro = false;
-
-                subfolderPlano();
+                subMenu.doItOnce(plano);
             }
             this.showSubfolderCilindro = function () {
-                executedesfera = false;
-                executedplano = false;
-
-                subfolderCilindro();
+                subMenu.doItOnce(cilindro);
             }
-
         }
-        var menuInicial = new initMenu();
+        let menuInicial = new initMenu();
 
         function webGLStart() {
             var canvas = document.getElementById("myCanvas");
             initGL(canvas);
             initShaders();
-
-
-            //crearGeometria();
 
             gl.clearColor(66.2, 0.2, 0.2, 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT);
@@ -360,7 +347,6 @@
 
             $(window).on("resize", onResize);
             menuInicial.show();
-            //menuInicial.showSubfolderCilindro()
             tick();
         }
 
