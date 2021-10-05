@@ -93,13 +93,24 @@ function tuboSenoidal(amplitud, longitudDeOnda, altura, radio) {
         return [x, y, z];
     };
     //normal en cada vertice
+    let delta = 0.000001;
     this.getNormal = function (u, v) {
-        //calculo algebraico 
+        op = new normalOperations();
+        a = new Array;
+        b = new Array;
+        cross = new Array;
 
-        
-        return [1, 0, 0];
+        p0 = this.getPosicion(u - delta, v - delta);
+        p1 = this.getPosicion(u - delta, v);
+        p2 = this.getPosicion(u, v - delta);
+        a = op.restaArray(p0, p1);
+        b = op.restaArray(p0, p2);
+        if (u <= 0.5 && u != 0) { //corrige cuando u=[0,2PI]
+            c = a; a = b; b = c;
+        }
+        cross = op.crossProduct(a, b);
+        return op.normalizar(cross);
     };
-
     //se texturiza de manera aleatoria
     this.getCoordenadasTextura = function (u, v) {
         u = Math.PI * u;
@@ -108,6 +119,22 @@ function tuboSenoidal(amplitud, longitudDeOnda, altura, radio) {
     };
 
 }
+function normalOperations() {
+    this.restaArray = function (array1, array2) {
+        resultado = new Array;
+        for (var i = 0; i < array1.length; i++) {
+            resultado.push(array1[i] - array2[i]);
+        }
+        return resultado;
+    };
+    this.crossProduct = function (a, b) {
+        return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    };
+    this.normalizar = function (array) {
+        norm = Math.sqrt(array[0] ** 2 + array[1] ** 2 + array[2] ** 2);
+        return [array[0] / norm, array[1] / norm, array[2] / norm];
+    };
+};
 
 function Esfera(radio) {
     // u = [0, 2PI] .... v =[0, PI]
@@ -120,17 +147,24 @@ function Esfera(radio) {
         return [x, y, z];
     };
     //normal en cada vertice
+    let delta = 0.00001;
     this.getNormal = function (u, v) {
-        // Calculo que consume muchos recursos.
-        // u = 2 * Math.PI * u;
-        // v = Math.PI * v;
-        // var coef = 1;//radio * radio * Math.sin(u);
-        // var x_N = Math.cos(v) * Math.sin(u);
-        // var y_N = Math.sin(u) * Math.sin(v);
-        // var z_N = Math.cos(u);
-        // return [coef * x_N, coef * y_N, coef * z_N];
-        return [1, 0, 0];
+        op = new normalOperations();
+        a = new Array;
+        b = new Array;
+        cross = new Array;
 
+        p0 = this.getPosicion(u - delta, v - delta);
+        p1 = this.getPosicion(u - delta, v);
+        p2 = this.getPosicion(u, v - delta);
+        a = op.restaArray(p0, p1);
+        b = op.restaArray(p0, p2);
+        if (u <= 0.5 && u != 0) { //corrige error en los signos de la esfera
+            c = a; a = b; b = c;
+        }
+        cross = op.crossProduct(a, b);
+        //console.log(op.normalizar(cross));
+        return op.normalizar(cross);
     };
 
     //se texturiza de manera aleatoria
