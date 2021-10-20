@@ -1,6 +1,7 @@
 <!doctype html>
 
 <head>
+
     <script src="js/jquery.js"></script>
     <script src="js/gl-matrix-3.3.0.js"></script>
     <script src="js/webgl-utils.js"></script>
@@ -14,8 +15,7 @@
         body {
             padding: 0;
             margin: 0;
-            height: 100%;
-            ;
+            height: 100%;;
         }
 
         #myCanvas {
@@ -24,338 +24,383 @@
             overflow: hidden;
         }
     </style>
+    <title>Superficies Parametricas</title>
 
 </head>
 
 <body>
 
-    <canvas id="myCanvas">
-        Your browser does not support the HTML5 canvas element.
-    </canvas>
+<canvas id="myCanvas">
+    Your browser does not support the HTML5 canvas element.
+</canvas>
 
 
-    <script>
+<script>
 
-        var vertexShaderFile = "vertex-shader.glsl";
-        var modo = "edges"; // wireframe, smooth, edges
-        var shaderProgram;
-        var time = 0;
+    var vertexShaderFile = "vertex-shader.glsl";
+    var modo = "edges"; // wireframe, smooth, edges
+    var shaderProgram;
+    var time = 0;
 
-        var gl;
-        var mat4 = glMatrix.mat4;
-        var mat3 = glMatrix.mat3;
-        var vec3 = glMatrix.vec3;
+    var gl;
+    var mat4 = glMatrix.mat4;
+    var mat3 = glMatrix.mat3;
+    var vec3 = glMatrix.vec3;
 
-        var earth;
+    var earth;
 
-        var $canvas = $("#myCanvas");
-        var aspect = $canvas.width() / $canvas.height();
+    var $canvas = $("#myCanvas");
+    var aspect = $canvas.width() / $canvas.height();
 
-        var distanciaCamara = 3;
-        var alturaCamara = 2;
-        var velocidadAngular = 0.15;
+    var distanciaCamara = 3;
+    var alturaCamara = 2;
+    var velocidadAngular = 0.15;
 
-        var lighting = "true";
+    var lighting = "true";
 
-        var vertexShaderSource;
-        var fragmentShaderSource;
+    var vertexShaderSource;
+    var fragmentShaderSource;
 
-        var matrizProyeccion = mat4.create();
-        var matrizVista = mat4.create();
-        var matrizModelado = mat4.create();
+    var matrizProyeccion = mat4.create();
+    var matrizVista = mat4.create();
+    var matrizModelado = mat4.create();
 
 
+    function initGL(canvas) {
 
-        function initGL(canvas) {
-
-            try {
-                gl = canvas.getContext("webgl");
-                gl.canvas.width = $canvas.width();
-                gl.canvas.height = $canvas.height();
-            } catch (e) {
-                console.error(e);
-            }
-            if (!gl) {
-                alert("Could not initialise WebGL, sorry :-(");
-            }
-        }
-
-        function loadShaders() {
-
-            $.when(loadVS(), loadFS()).done(function (res1, res2) {
-                //this code is this.executed when all ajax calls are done     
-                webGLStart();
-            });
-
-            function loadVS() {
-                return $.ajax({
-                    url: "shaders/" + vertexShaderFile,
-                    success: function (result) {
-                        vertexShaderSource = result;
-                    }
-                });
-            }
-
-            function loadFS() {
-                return $.ajax({
-                    url: "shaders/fragment-shader.glsl",
-                    success: function (result) {
-                        fragmentShaderSource = result;
-                    }
-                });
-            }
-        }
-
-        function getShader(gl, code, type) {
-
-            var shader;
-
-            if (type == "fragment")
-                shader = gl.createShader(gl.FRAGMENT_SHADER);
-            else // "vertex"
-                shader = gl.createShader(gl.VERTEX_SHADER);
-
-            gl.shaderSource(shader, code);
-            gl.compileShader(shader);
-
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                console.error(gl.getShaderInfoLog(shader));
-                return null;
-            }
-            return shader;
-        }
-
-        function onResize() {
+        try {
+            gl = canvas.getContext("webgl");
             gl.canvas.width = $canvas.width();
             gl.canvas.height = $canvas.height();
-            aspect = $canvas.width() / $canvas.height();
+        } catch (e) {
+            console.error(e);
         }
-
-        function getShaderSource(url) {
-            var req = new XMLHttpRequest();
-            req.open("GET", url, false);
-            req.send(null);
-            return (req.status == 200) ? req.responseText : null;
-        };
-
-        function initShaders() {
-
-            var fragmentShader = getShader(gl, vertexShaderSource, "vertex");
-            var vertexShader = getShader(gl, fragmentShaderSource, "fragment");
-
-            shaderProgram = gl.createProgram();
-            gl.attachShader(shaderProgram, vertexShader);
-            gl.attachShader(shaderProgram, fragmentShader);
-            gl.linkProgram(shaderProgram);
-
-            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-                alert("Could not initialise shaders");
-            }
-
-            gl.useProgram(shaderProgram);
-
-            shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aPosition");
-            gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-
-            shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aUv");
-            gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
-
-            shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aNormal");
-            gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
-
-            shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-            shaderProgram.mMatrixUniform = gl.getUniformLocation(shaderProgram, "uMMatrix");
-            shaderProgram.vMatrixUniform = gl.getUniformLocation(shaderProgram, "uVMatrix");
-            shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
-            shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
-            shaderProgram.useLightingUniform = gl.getUniformLocation(shaderProgram, "uUseLighting");
-            shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbientColor");
-            shaderProgram.frameUniform = gl.getUniformLocation(shaderProgram, "time");
-            shaderProgram.lightingDirectionUniform = gl.getUniformLocation(shaderProgram, "uLightPosition");
-            shaderProgram.directionalColorUniform = gl.getUniformLocation(shaderProgram, "uDirectionalColor");
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
         }
+    }
 
+    function loadShaders() {
 
-        function setMatrixUniforms() {
+        $.when(loadVS(), loadFS()).done(function (res1, res2) {
+            //this code is this.executed when all ajax calls are done
+            webGLStart();
+        });
 
-            gl.uniformMatrix4fv(shaderProgram.mMatrixUniform, false, matrizModelado);
-            gl.uniformMatrix4fv(shaderProgram.vMatrixUniform, false, matrizVista);
-            gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, matrizProyeccion);
-
-            var normalMatrix = mat3.create();
-            mat3.fromMat4(normalMatrix, matrizModelado); // normalMatrix= (inversa(traspuesta(matrizModelado)));
-
-            mat3.invert(normalMatrix, normalMatrix);
-            mat3.transpose(normalMatrix, normalMatrix);
-
-            gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
-        }
-
-        function drawScene() {
-
-            // Se configura el viewport dentro del "canvas". 
-            // En este caso se utiliza toda el área disponible
-            gl.viewport(0, 0, $canvas.width(), $canvas.height());
-
-            // Se habilita el color de borrado para la pantalla (Color Buffer) y otros buffers
-            gl.clearColor(0.2, 0.2, 0.2, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-            // Se configura la matriz de proyección
-            mat4.identity(matrizProyeccion);
-            mat4.perspective(matrizProyeccion, 30, aspect, 0.1, 100.0);
-            mat4.scale(matrizProyeccion, matrizProyeccion, [1, -1, 1]); // parche para hacer un flip de Y, parece haber un bug en glmatrix
-
-            // Se inicializan las variables asociadas con la Iluminación
-
-            gl.uniform1f(shaderProgram.frameUniform, time / 10.0);
-            gl.uniform3f(shaderProgram.ambientColorUniform, 0.6, 0.6, 0.6);
-            gl.uniform3f(shaderProgram.directionalColorUniform, 1.2, 1.1, 0.7);
-            gl.uniform1i(shaderProgram.useLightingUniform, (lighting == "true"));
-
-            // Definimos la ubicación de la camara                        
-
-            mat4.lookAt(matrizVista,
-                vec3.fromValues(0, alturaCamara, distanciaCamara),
-                vec3.fromValues(0, 0, 0),
-                vec3.fromValues(0, 1, 0)
-            );
-
-            var lightPosition = [10.0, 0.0, 3.0];
-            gl.uniform3fv(shaderProgram.lightingDirectionUniform, lightPosition);
-
-            setMatrixUniforms();
-            dibujarGeometria();
-
-        }
-
-        function tick() {
-            requestAnimFrame(tick);
-            time += 1 / 60;
-
-            // acumulo rotaciones en matrizModelado		        
-            mat4.rotate(matrizModelado, matrizModelado, 0.03 * velocidadAngular, [0, 1, 0]);
-
-            drawScene();
-        }
-
-        function subFolder(gui_folder) {
-            let Superficies = new Set();
-            this.agregarSuperficie = function (unaSuperficie) {
-                Superficies.add(unaSuperficie);
-            };
-            let superficieActual = undefined;
-            let execute;
-
-            this.doItOnce = function (unaSuperficie) {
-                // Si cambia de superficie en los infinitos llamados se resetea 
-                // la funcion anonima menuEnPantalla(solo se ejectua una vez)
-                execute = (unaSuperficie == superficieActual) ? true : false;
-                if (Superficies.has(unaSuperficie))
-                    superficieActual = unaSuperficie;
-                else
-                    console.log("Esta superficie no se encuentra cargada");
-                menuEnPantalla();
-            };
-            let removerMenuAnterior = function () {
-                if (typeof gui_folder.menuFolder != "undefined") {
-                    gui_folder.gui.removeFolder(gui_folder.menuFolder);
-                    gui_folder.menuFolder = undefined;
+        function loadVS() {
+            return $.ajax({
+                url: "shaders/" + vertexShaderFile,
+                success: function (result) {
+                    vertexShaderSource = result;
                 }
-            }
-            let menuEnPantalla = (function () {
-                execute = false;
-                return function () {
-                    if (!execute) {
-                        execute = true; //solo ingreso una vez a menos que setee false desde afuera
-                        removerMenuAnterior();
-                        superficieActual.cargarSubMenu(gui_folder);
-                    }
-                };
-            })();
+            });
         }
 
-        function subFolderCilindro() {
-            this.cargarSubMenu = function (gui_folder) {
-                gui_folder.menuFolder = gui_folder.gui.addFolder("Cilindro");
-                gui_folder.menuFolder.add(window, "amplitudCilindro", 0.1, 0.4).step(0.01);
-                gui_folder.menuFolder.add(window, "longitudDeOndaCilindro", 1, 10).step(1);
-                gui_folder.menuFolder.add(window, "alturaCilindro", 1, 5).step(0.2);
-                gui_folder.menuFolder.add(window, "radioCilindro", 0.1, 2).step(0.1);
-                gui_folder.menuFolder.open();
-            }
-        };
+        function loadFS() {
+            return $.ajax({
+                url: "shaders/fragment-shader.glsl",
+                success: function (result) {
+                    fragmentShaderSource = result;
+                }
+            });
+        }
+    }
 
-        function subFolderPlano() {
-            this.cargarSubMenu = function (gui_folder) {
-                gui_folder.menuFolder = gui_folder.gui.addFolder("Plano");
-                gui_folder.menuFolder.add(window, "anchoPlano", 0, 6).step(0.1);
-                gui_folder.menuFolder.add(window, "largoPlano", 0, 6).step(0.1);
-                gui_folder.menuFolder.open();
-            }
+    function getShader(gl, code, type) {
 
+        var shader;
+
+        if (type == "fragment")
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        else // "vertex"
+            shader = gl.createShader(gl.VERTEX_SHADER);
+
+        gl.shaderSource(shader, code);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            return null;
+        }
+        return shader;
+    }
+
+    function onResize() {
+        gl.canvas.width = $canvas.width();
+        gl.canvas.height = $canvas.height();
+        aspect = $canvas.width() / $canvas.height();
+    }
+
+    function getShaderSource(url) {
+        var req = new XMLHttpRequest();
+        req.open("GET", url, false);
+        req.send(null);
+        return (req.status == 200) ? req.responseText : null;
+    }
+
+    function initShaders() {
+
+        var fragmentShader = getShader(gl, vertexShaderSource, "vertex");
+        var vertexShader = getShader(gl, fragmentShaderSource, "fragment");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aUv");
+        gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+        shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aNormal");
+        gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mMatrixUniform = gl.getUniformLocation(shaderProgram, "uMMatrix");
+        shaderProgram.vMatrixUniform = gl.getUniformLocation(shaderProgram, "uVMatrix");
+        shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
+        shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+        shaderProgram.useLightingUniform = gl.getUniformLocation(shaderProgram, "uUseLighting");
+        shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbientColor");
+        shaderProgram.frameUniform = gl.getUniformLocation(shaderProgram, "time");
+        shaderProgram.lightingDirectionUniform = gl.getUniformLocation(shaderProgram, "uLightPosition");
+        shaderProgram.directionalColorUniform = gl.getUniformLocation(shaderProgram, "uDirectionalColor");
+    }
+
+
+    function setMatrixUniforms() {
+
+        gl.uniformMatrix4fv(shaderProgram.mMatrixUniform, false, matrizModelado);
+        gl.uniformMatrix4fv(shaderProgram.vMatrixUniform, false, matrizVista);
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, matrizProyeccion);
+
+        var normalMatrix = mat3.create();
+        mat3.fromMat4(normalMatrix, matrizModelado); // normalMatrix= (inversa(traspuesta(matrizModelado)));
+
+        mat3.invert(normalMatrix, normalMatrix);
+        mat3.transpose(normalMatrix, normalMatrix);
+
+        gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, normalMatrix);
+    }
+
+    function drawScene() {
+
+        // Se configura el viewport dentro del "canvas".
+        // En este caso se utiliza toda el área disponible
+        gl.viewport(0, 0, $canvas.width(), $canvas.height());
+
+        // Se habilita el color de borrado para la pantalla (Color Buffer) y otros buffers
+        gl.clearColor(0.2, 0.2, 0.2, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Se configura la matriz de proyección
+        mat4.identity(matrizProyeccion);
+        mat4.perspective(matrizProyeccion, 30, aspect, 0.1, 100.0);
+        mat4.scale(matrizProyeccion, matrizProyeccion, [1, -1, 1]); // parche para hacer un flip de Y, parece haber un bug en glmatrix
+
+        // Se inicializan las variables asociadas con la Iluminación
+
+        gl.uniform1f(shaderProgram.frameUniform, time / 10.0);
+        gl.uniform3f(shaderProgram.ambientColorUniform, 0.6, 0.6, 0.6);
+        gl.uniform3f(shaderProgram.directionalColorUniform, 1.2, 1.1, 0.7);
+        gl.uniform1i(shaderProgram.useLightingUniform, (lighting == "true"));
+
+        // Definimos la ubicación de la camara
+
+        mat4.lookAt(matrizVista,
+            vec3.fromValues(0, alturaCamara, distanciaCamara),
+            vec3.fromValues(0, 0, 0),
+            vec3.fromValues(0, 1, 0)
+        );
+
+        var lightPosition = [10.0, 0.0, 3.0];
+        gl.uniform3fv(shaderProgram.lightingDirectionUniform, lightPosition);
+
+        setMatrixUniforms();
+        dibujarGeometria();
+
+    }
+
+    function tick() {
+        requestAnimFrame(tick);
+        time += 1 / 60;
+
+        // acumulo rotaciones en matrizModelado
+        mat4.rotate(matrizModelado, matrizModelado, 0.03 * velocidadAngular, [0, 1, 0]);
+
+        drawScene();
+    }
+
+    function SubFolder(gui_folder) {
+        let Superficies = new Set();
+        this.agregarSuperficie = function (unaSuperficie) {
+            Superficies.add(unaSuperficie);
         };
-        function subFolderEsfera() {
-            this.cargarSubMenu = function (gui_folder) {
-                gui_folder.menuFolder = gui_folder.gui.addFolder("Esfera");
-                gui_folder.menuFolder.add(window, "radioEsfera", 0, 2).step(0.1);
-                gui_folder.menuFolder.open();
+        let superficieActual = undefined;
+        let execute;
+
+        this.doItOnce = function (unaSuperficie) {
+            // Si cambia de superficie en los infinitos llamados se resetea
+            // la funcion anonima menuEnPantalla(solo se ejectua una vez)
+            // execute = (unaSuperficie === superficieActual) ? true : false;
+            execute = (unaSuperficie === superficieActual);
+            if (Superficies.has(unaSuperficie))
+                superficieActual = unaSuperficie;
+            else
+                console.log("Esta superficie no se encuentra cargada");
+            menuEnPantalla();
+        };
+        let removerMenuAnterior = function () {
+            if (typeof gui_folder.menuFolder != "undefined") {
+                gui_folder.gui.removeFolder(gui_folder.menuFolder);
+                gui_folder.menuFolder = undefined;
             }
-        };
-        function initMenu() {
-            let gui_folder = {
-                gui: new dat.GUI(),
-                menuFolder: undefined,
+        }
+        let menuEnPantalla = (function () {
+            execute = false;
+            return function () {
+                if (!execute) {
+                    execute = true; //solo ingreso una vez a menos que setee false desde afuera
+                    removerMenuAnterior();
+                    superficieActual.cargarSubMenu(gui_folder);
+                }
             };
-            //menu fijo
-            this.show = function () {
-                gui_folder.gui.add(window, "distanciaCamara", 0.01, 5).step(0.01);
-                gui_folder.gui.add(window, "alturaCamara", -4, 4).step(0.01);
-                gui_folder.gui.add(window, "velocidadAngular", 0, 1).step(0.01);
-                gui_folder.gui.add(window, "filas", 0, 50).step(1);
-                gui_folder.gui.add(window, "columnas", 0, 50).step(1);
-                gui_folder.gui.add(window, "modo", ["wireframe", "smooth", "edges"]);
-                gui_folder.gui.add(window, "superficieParametrica", ["cilindro", "plano", "esfera"]);
-
-            }
-            let subMenu = new subFolder(gui_folder);
-            subMenu.agregarSuperficie(esfera = new subFolderEsfera);
-            subMenu.agregarSuperficie(cilindro = new subFolderCilindro);
-            subMenu.agregarSuperficie(plano = new subFolderPlano);
-
-            //infinitos llamados a una de las tres funciones en el programa, se ejecuta metodo anonimo solo una vez
-            this.showSubfolderEsfera = function () {
-                subMenu.doItOnce(esfera);
-            }
-            this.showSubfolderPlano = function () {
-                subMenu.doItOnce(plano);
-            }
-            this.showSubfolderCilindro = function () {
-                subMenu.doItOnce(cilindro);
-            }
+        })();
+    }
+    class SubFolderSuperficieParametrica{
+        constructor(nombre) {
+            this.nombre = nombre; //realmente no importa el nombre, se borra el gui en cada superf
         }
-        let menuInicial = new initMenu();
+        cargarSubMenu(gui_folder){
+            gui_folder.menuFolder = gui_folder.gui.addFolder(this.nombre);
+            this.cargarCaracteristicasAlSubMenu(gui_folder)
+            gui_folder.menuFolder.open();
+        }
+        //metodo abstracto, lo tengo que sobrecargar
+        cargarCaracteristicasAlSubMenu(gui_folder) {
+        }
+    }
+    class SubFolderCilindro extends SubFolderSuperficieParametrica{
+        constructor() {
+            super("Cilindro");
+        }
+        cargarCaracteristicasAlSubMenu(gui_folder){
+            gui_folder.menuFolder.add(window, "amplitudCilindro", 0.1, 0.4).step(0.01);
+            gui_folder.menuFolder.add(window, "longitudDeOndaCilindro", 1, 10).step(1);
+            gui_folder.menuFolder.add(window, "alturaCilindro", 1, 5).step(0.2);
+            gui_folder.menuFolder.add(window, "radioCilindro", 0.1, 2).step(0.1);
+        }
+    }
+    class SubFolderPlano extends SubFolderSuperficieParametrica{
+        constructor() {
+            super("Plano");
+        }
+        cargarCaracteristicasAlSubMenu(gui_folder){
+            gui_folder.menuFolder.add(window, "anchoPlano", 0, 6).step(0.1);
+            gui_folder.menuFolder.add(window, "largoPlano", 0, 6).step(0.1);
+        }
+    }
+    class SubFolderEsfera extends SubFolderSuperficieParametrica{
+        constructor() {
+            super("Esfera");
+        }
+        cargarCaracteristicasAlSubMenu(gui_folder){
+            gui_folder.menuFolder.add(window, "radioEsfera", 0, 2).step(0.1);
+        }
+    }
+/*
+    function SubFolderCilindro() {
+        this.cargarSubMenu = function (gui_folder) {
+            gui_folder.menuFolder = gui_folder.gui.addFolder("Cilindro");
+            gui_folder.menuFolder.add(window, "amplitudCilindro", 0.1, 0.4).step(0.01);
+            gui_folder.menuFolder.add(window, "longitudDeOndaCilindro", 1, 10).step(1);
+            gui_folder.menuFolder.add(window, "alturaCilindro", 1, 5).step(0.2);
+            gui_folder.menuFolder.add(window, "radioCilindro", 0.1, 2).step(0.1);
+            gui_folder.menuFolder.open();
+        }
+    }
 
-        function webGLStart() {
-            var canvas = document.getElementById("myCanvas");
-            initGL(canvas);
-            initShaders();
-
-            gl.clearColor(66.2, 0.2, 0.2, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.enable(gl.DEPTH_TEST);
-
-            $(window).on("resize", onResize);
-            menuInicial.show();
-            tick();
+    function SubFolderPlano() {
+        this.cargarSubMenu = function (gui_folder) {
+            gui_folder.menuFolder = gui_folder.gui.addFolder("Plano");
+            gui_folder.menuFolder.add(window, "anchoPlano", 0, 6).step(0.1);
+            gui_folder.menuFolder.add(window, "largoPlano", 0, 6).step(0.1);
+            gui_folder.menuFolder.open();
         }
 
-        // cuando el documento HTML esta completo, iniciamos la aplicación
-        $(document).ready(function () {
-            loadShaders();
-        })
+    }
 
-    </script>
+    function SubFolderEsfera() {
+        this.cargarSubMenu = function (gui_folder) {
+            gui_folder.menuFolder = gui_folder.gui.addFolder("Esfera");
+            gui_folder.menuFolder.add(window, "radioEsfera", 0, 2).step(0.1);
+            gui_folder.menuFolder.open();
+        }
+    }
+*/
+    function initMenu() {
+        let gui_folder = {
+            gui: new dat.GUI(),
+            menuFolder: undefined,
+        };
+        //menu fijo
+        this.show = function () {
+            gui_folder.gui.add(window, "distanciaCamara", 0.01, 5).step(0.01);
+            gui_folder.gui.add(window, "alturaCamara", -4, 4).step(0.01);
+            gui_folder.gui.add(window, "velocidadAngular", 0, 1).step(0.01);
+            gui_folder.gui.add(window, "filas", 0, 50).step(1);
+            gui_folder.gui.add(window, "columnas", 0, 50).step(1);
+            gui_folder.gui.add(window, "modo", ["wireframe", "smooth", "edges"]);
+            gui_folder.gui.add(window, "superficieParametrica", ["cilindro", "plano", "esfera"]);
+
+        }
+        let subMenu = new SubFolder(gui_folder);
+        subMenu.agregarSuperficie(esfera = new SubFolderEsfera());
+        subMenu.agregarSuperficie(cilindro = new SubFolderCilindro());
+        subMenu.agregarSuperficie(plano = new SubFolderPlano());
+
+        //infinitos llamados a una de las tres funciones en el programa, se ejecuta metodo anonimo solo una vez
+        this.showSubfolderEsfera = function () {
+            subMenu.doItOnce(esfera);
+        }
+        this.showSubfolderPlano = function () {
+            subMenu.doItOnce(plano);
+        }
+        this.showSubfolderCilindro = function () {
+            subMenu.doItOnce(cilindro);
+        }
+    }
+
+    let menuInicial = new initMenu();
+
+    function webGLStart() {
+        var canvas = document.getElementById("myCanvas");
+        initGL(canvas);
+        initShaders();
+
+        gl.clearColor(66.2, 0.2, 0.2, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+
+        $(window).on("resize", onResize);
+        menuInicial.show();
+        tick();
+    }
+
+    // cuando el documento HTML esta completo, iniciamos la aplicación
+    $(document).ready(function () {
+        loadShaders();
+    })
+
+</script>
 
 </body>
 
